@@ -41,9 +41,8 @@ def rsync_files(src_data, dest_data, log_file):
         subprocess.run(command, stdout=log, stderr=subprocess.STDOUT)
 
 def backup_user_directories(mount_point, local_path, log_file):
-    # user_dirs = ['Desktop', 'Documents', 'Downloads', 'Pictures', 'Music', 'Videos', 'AppData', 'Temp']
-    user_dirs = ['Pictures']
-
+    user_dirs = ['Desktop', 'Documents', 'Downloads', 'Pictures', 'Music', 'Videos', 'AppData', 'Temp']
+    
     # Find all user directories under 'Users/'
     users_path = os.path.join(mount_point, 'Users')
     if os.path.exists(users_path):
