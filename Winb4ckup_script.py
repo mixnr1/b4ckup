@@ -14,24 +14,28 @@ def list_files(directory):
     return file_list
 
 def rsync_files(src_data, dest_data, log_file):
-    # List files in the source and destination directories
-    src_files = list_files(src_data.rstrip('/'))
-    dest_files = list_files(dest_data.rstrip('/'))
+    # List of file extensions to exclude
+    excluded_extensions = [
+        '*.exe', '*.rdp', '*.url', '*.edb', '*.css', '*.js', '*.jsm', '*.tbs', '*.nbw', '*.java', '*.php', '*.py', '*.sh',
+        '*.pgp', '*.nbb', '*.msf', '*.fingerprint', '*.asc', '*.nomedia', '*.dwl2', '*.efg', '*.loaded_0', '*._paymusicid',
+        '*.manifest', '*.mab', '*.mozlz4', '*.000', '*.bin', '*.cdd', '*.cue', '*.daa', '*.dao', '*.dmg', '*.img', '*.iso',
+        '*.isz', '*.mdf', '*.mds', '*.mdx', '*.nrg', '*.tao', '*.tc', '*.toast', '*.uif', '*.vcd', '*.mp4', '*.mp4a', '*.mpa',
+        '*.mp3', '*.mp3a', '*.mpega', '*.avi', '*.mkv', '*.webm', '*.mpeg', '*.wmv', '*.ts', '*.mpeg4', '*.mpg', '*.m4v',
+        '*.mov', '*.mpeg2', '*.gz'
+    ]
 
-    # Find files that are present in the destination but missing in the source
-    deleted_files = set(dest_files) - set(src_files)
-
-    # Log the files that have been deleted from the source
-    with open(log_file, "a") as log:
-        for file in deleted_files:
-            log.write(f"File deleted in source but kept in destination: {file}\n")
+    # Construct rsync exclude parameters
+    exclude_params = []
+    for ext in excluded_extensions:
+        exclude_params.extend(['--exclude', ext])
 
     # Now run rsync without --delete to sync files without deleting anything in the destination
     command = [
         "rsync", 
         "-a",                # Archive mode, includes recursive copy, symbolic links, permissions, etc.
         "--itemize-changes", # Show what is being changed (transferred, skipped, etc.)
-        "--out-format=%i %n",# Custom format for output, showing the action and file path
+        "--out-format=%i %n" # Custom format for output, showing the action and file path
+    ] + exclude_params + [
         src_data.rstrip('/') + '/',  # Ensure there is a trailing slash to copy the contents, not the directory itself
         dest_data
     ]
@@ -72,7 +76,7 @@ def main():
     log_file = f'{config.path}backup_{timestamp}.log'
     
     logging.basicConfig(filename=log_file, filemode='a', 
-                        format='%(asctime)s | %(levelname)s | %(message)s', 
+                        format='%(asctime)s | %(levellevel)s | %(message)s', 
                         datefmt='%d.%m.%Y. %H:%M:%S')
 
     try:
@@ -112,5 +116,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
-
