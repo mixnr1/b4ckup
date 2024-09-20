@@ -5,14 +5,6 @@ import time
 import subprocess
 import os
 
-def list_files(directory):
-    """Recursively lists all files in a given directory."""
-    file_list = []
-    for root, dirs, files in os.walk(directory):
-        for file in files:
-            file_list.append(os.path.relpath(os.path.join(root, file), directory))
-    return file_list
-
 def rsync_files(src_data, dest_data, log_file):
     # List of file extensions to exclude
     excluded_extensions = [
@@ -46,7 +38,7 @@ def rsync_files(src_data, dest_data, log_file):
 
 def backup_user_directories(mount_point, local_path, log_file):
     user_dirs = ['Desktop', 'Documents', 'Downloads', 'Pictures', 'Music', 'Videos', 'AppData', 'Temp']
-    
+
     # Find all user directories under 'Users/'
     users_path = os.path.join(mount_point, 'Users')
     if os.path.exists(users_path):
