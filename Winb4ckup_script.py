@@ -12,7 +12,6 @@ def parse_rsync_output(line):
     """
     change_type = line[:11].strip()
     file_path = line[12:].strip()
-
     if change_type.startswith('>f+++++++++'):
         return f"INFO: File '{file_path}' created and transferred."
     elif change_type.startswith('>f..t......'):
@@ -37,14 +36,19 @@ def parse_rsync_output(line):
         return f"INFO: Directory '{file_path}' created."
     elif change_type.startswith('.d..t......'):
         return f"INFO: Directory '{file_path}' modification time updated."
+    elif change_type.startswith('.d..tp.....'):
+        return f"INFO: Directory '{file_path}' modification time and permissions updated."
     elif change_type.startswith('.f'):
-        return f"INFO: File '{file_path}' skipped (no changes)."
+        return None
+        # return f"INFO: File '{file_path}' skipped (no changes)."
     elif change_type.startswith('.d'):
-        return f"INFO: Directory '{file_path}' skipped (no changes)."
+        return None
+        # return f"INFO: Directory '{file_path}' skipped (no changes)."
     elif change_type.startswith('cL'):
         return f"INFO: Symbolic link '{file_path}' updated."
     elif change_type.startswith('.L'):
-        return f"INFO: Symbolic link '{file_path}' skipped (no changes)."
+        return None
+        # return f"INFO: Symbolic link '{file_path}' skipped (no changes)."
     elif change_type.startswith('c'):
         return f"INFO: Character device '{file_path}' updated."
     elif change_type.startswith('b'):
@@ -53,8 +57,14 @@ def parse_rsync_output(line):
         return f"INFO: Socket file '{file_path}' updated."
     elif change_type.startswith('>'):
         return f"INFO: Special file '{file_path}' created or transferred."
+    elif change_type.startswith('.d...p.....'):
+        return None
+        # return f"INFO: Directory '{file_path}' permissions updated."
+    elif change_type.startswith('.f...p.....'):
+        return None
+        # return f"INFO: File '{file_path}' permissions updated."
     else:
-        return f"INFO: File or directory '{file_path}' underwent some change."
+        return f"INFO: File or directory '{file_path}' underwent some change. Rsync output: {change_type}"
 
 
 def get_file_list(directory):
@@ -89,7 +99,7 @@ def log_deleted_files(src_data, dest_data, log_file):
 
 def rsync_files(src_data, dest_data, log_file):
     """
-    Perform rsync and log the details.
+    Perform rsync and log the details, using --checksum and --partial flags.
     """
     excluded_extensions = [
         '*.exe', '*.rdp', '*.url', '*.edb', '*.css', '*.js', '*.jsm', '*.tbs', '*.nbw', '*.java', '*.php', '*.py', '*.sh',
@@ -101,15 +111,27 @@ def rsync_files(src_data, dest_data, log_file):
     exclude_params = []
     for ext in excluded_extensions:
         exclude_params.extend(['--exclude', ext])
-    command = ["rsync", "-a", "--itemize-changes", "--out-format=%i %n"] + exclude_params + [
-        src_data.rstrip('/') + '/', dest_data]
-    
-    # Run rsync process
+  
+    command = [
+        "rsync", 
+        "-a",                  # Archive mode, includes recursive copy, symbolic links, permissions, etc.
+        "--itemize-changes",   # Show what is being changed (transferred, skipped, etc.)
+        "--checksum",          # Use checksums to determine file differences
+        "--partial",           # Keep partially transferred files to resume later
+        "--out-format=%i %n"   # Custom format for output, showing the action and file path
+    ] + exclude_params + [
+        src_data.rstrip('/') + '/',  # Ensure there is a trailing slash to copy the contents, not the directory itself
+        dest_data
+    ]  
     try:
         rsync_process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
         with open(log_file, "a") as log:
             for line in rsync_process.stdout:
                 human_readable_info = parse_rsync_output(line)
+                # Skip logging if the output is None (for excluded patterns)
+                if human_readable_info is None:
+                    continue  # Skip writing to the log
+                # Only write if human_readable_info is not None
                 timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
                 full_file_path = os.path.join(dest_data, line[12:].strip())
                 log_message = f"{timestamp} {full_file_path}. {human_readable_info}\n"
@@ -124,7 +146,6 @@ def rsync_files(src_data, dest_data, log_file):
         logging.error(f"Rsync process error: {e}")
     
     log_deleted_files(src_data, dest_data, log_file)
-
 
 def mount_cifs_share(ip_address):
     """
