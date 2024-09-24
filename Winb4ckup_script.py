@@ -13,22 +13,46 @@ import sys
 import threading
 
 class ConnectionMonitor(threading.Thread):
+    """
+    This class monitors the network connection to a specified IP address by pinging it at regular intervals.
+    It runs as a separate thread to allow concurrent execution without blocking other processes.
+    """
     def __init__(self, ip_address, interval=30):
-        super().__init__()
-        self.ip_address = ip_address
-        self.interval = interval
-        self.is_alive = True
-        self.stop_monitoring = False
+        """
+        Initializes the ConnectionMonitor object.
+        
+        Args:
+        ip_address (str): The IP address to ping and monitor.
+        interval (int): The interval (in seconds) between each ping request. Defaults to 30 seconds.
+        """
+        super().__init__() # Initialize the parent class (threading.Thread)
+        self.ip_address = ip_address # IP address to monitor
+        self.interval = interval # Interval for checking the connection (in seconds)
+        self.is_alive = True # Connection status (True means connected)
+        self.stop_monitoring = False # Flag to stop the monitoring thread
 
     def run(self):
+        """
+        This method is executed when the thread starts.
+        It continuously pings the IP address at the specified interval until `stop_monitoring` is set to True.
+        If the ping fails, it sets `is_alive` to False and logs a warning.
+        """
+
         while not self.stop_monitoring:
+            # Ping the IP address and check if it's reachable
             result = ping_host(self.ip_address)
+            # If the ping fails (return code is non-zero), the connection is considered lost
             if result.returncode != 0:
-                self.is_alive = False
-                logging.warning(f"Connection to {self.ip_address} lost.")
+                self.is_alive = False # Set the connection status to False
+                logging.warning(f"Connection to {self.ip_address} lost.") # Log the connection loss warning
+            # Wait for the specified interval before the next ping
             sleep(self.interval)
 
     def stop(self):
+        """
+        Stops the monitoring loop by setting `stop_monitoring` to True.
+        This will break the while loop in the `run` method and terminate the thread.
+        """
         self.stop_monitoring = True
 
 class Spinner:
@@ -70,14 +94,37 @@ class Spinner:
 
 def ping_host(ip_address):
     """
-    Ping the host based on the current OS platform.
+    Ping the specified IP address based on the current operating system (OS).
+    This function sends a single ping request to the given IP address and returns the result.
+    
+    Args:
+    ip_address (str): The IP address to ping.
+    
+    Returns:
+    subprocess.CompletedProcess: The result of the ping command, including the return code and any output.
+                                A return code of 0 indicates success (the host is reachable), 
+                                while a non-zero return code indicates failure.
     """
+    # Detect the current OS platform (e.g., Windows, Linux, macOS) and convert it to lowercase
     system = platform.system().lower()
+    # If the system is Windows, use the appropriate Windows ping command format
     if system == "windows":
-        return subprocess.run(['ping', '-n', '1', '-w', '1000', ip_address], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        # '-n 1': Send one ping request
+        # '-w 1000': Timeout for each ping request is set to 1000 milliseconds (1 second)
+        return subprocess.run(
+            ['ping', '-n', '1', '-w', '1000', ip_address], # Ping command for Windows
+            stdout=subprocess.PIPE, # Capture the standard output
+            stderr=subprocess.PIPE # Capture the standard error
+        )
     else:
-        return subprocess.run(['ping', '-c', '1', '-W', '1', ip_address], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-
+        # For non-Windows systems (Linux, macOS), use the Unix-style ping command
+        # '-c 1': Send one ping request
+        # '-W 1': Wait up to 1 second for a response before timing out
+        return subprocess.run(
+            ['ping', '-c', '1', '-W', '1', ip_address], # Ping command for Unix-like systems
+            stdout=subprocess.PIPE, # Capture the standard output
+            stderr=subprocess.PIPE # Capture the standard error
+        )
 
 def parse_rsync_output(line):
     """
@@ -169,15 +216,22 @@ def log_deleted_files(src_data, dest_data, log_file):
 
 def terminate_rsync(rsync_process):
     """
-    Terminate the rsync process.
+    Terminate the rsync process. First, try to stop it gracefully. If it doesn't
+    stop within a specified timeout, forcefully kill the process.
     """
     try:
+        # Check if rsync_process is not None and is still running (poll() returns None if the process is running)
         if rsync_process and rsync_process.poll() is None:  # Check if the process is running
+            # Attempt to gracefully terminate the process
             rsync_process.terminate()
+            # Wait for the process to exit within 10 seconds
             rsync_process.wait(timeout=10)
+            # Log that the rsync process terminated safely
             logging.info("Rsync process terminated safely.")
     except subprocess.TimeoutExpired:
+        # If the process doesn't terminate within the specified time, log the error
         logging.error("Rsync did not terminate in time. Forcing kill.")
+        # Forcefully kill the rsync process
         rsync_process.kill()
 
 def rsync_files(src_data, dest_data, log_file, ip_address):
@@ -260,7 +314,7 @@ def rsync_files(src_data, dest_data, log_file, ip_address):
         monitor.stop()
         unmount_cifs_share()  # Ensure the share is unmounted after the process
 
-    log_deleted_files(src_data, dest_data, log_file)
+    #log_deleted_files(src_data, dest_data, log_file)
 
 def mount_cifs_share(ip_address):
     """
